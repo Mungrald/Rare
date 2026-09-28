@@ -1,0 +1,137 @@
+--[[
+                
+                                                            
+                    ██████▒                                
+                    ███████▓                               
+                    ██   ▒██                               
+                    ██    ██   ▒████▓    ██░████   ░████▒  
+                    ██   ▒██   ██████▓   ███████  ░██████▒ 
+                    ███████▒   █▒  ▒██   ███░     ██▒  ▒██ 
+                    ██████▓     ▒█████   ██       ████████ 
+                    ██  ▓██░  ░███████   ██       ████████ 
+                    ██   ██▓  ██▓░  ██   ██       ██       
+                    ██   ▒██  ██▒  ███   ██       ███░  ▒█ 
+                    ██    ██▒ ████████   ██       ░███████ 
+                    ██    ███  ▓███░██   ██        ░█████▒          
+
+        ┌─────────────────────────────────────────────────────────────────┐
+        │                                                                 │
+        │       Script    : Auto Alt Switcher                             │
+        │       Author    : mungrald                                      │
+        │       Discord   : https://discord.gg/F4rznCksYd                 │
+        │                                                                 │
+        └─────────────────────────────────────────────────────────────────┘
+
+]]
+
+
+if not game:IsLoaded() then game.Loaded:Wait() end
+
+local Players               = game:GetService("Players")
+local HttpService           = game:GetService("HttpService")
+
+local LocalPlayer           = Players.LocalPlayer
+
+local CoreGui               = game:GetService("CoreGui")
+local RobloxPromptGui       = CoreGui:FindFirstChild("RobloxPromptGui")
+local promptOverlay         = RobloxPromptGui:FindFirstChild("promptOverlay")
+
+
+
+-- // API Roblox Account Manager
+local BASE                  = "http://localhost:7963"
+local PASSWORD              = "Mungrald"
+
+
+-- // Variables
+local request               = http_request or request or (syn and syn.request)
+
+
+-- Scroll Accounts
+do
+
+    function GetAccounts()
+        local Accounts = {}
+
+        local response = request({
+            Url = BASE .. "/GetAccounts?Password=" .. PASSWORD,
+            Method = "GET"
+        })
+
+        if response.StatusCode ~= 200 then warn("HTTP " .. tostring(response.StatusCode) .. ": " .. tostring(response.Body)) return Accounts end
+
+        for name in string.gmatch(response.Body, "[^,%s]+") do table.insert(Accounts, name) end
+
+        return Accounts
+    end
+
+    function LaunchNewAccount()
+        local Accounts = GetAccounts()
+        for i, v in Accounts do
+            local response = request({
+                Url = BASE .. "/GetField?Account=" .. v .. "&Field=Banned",
+                Method = "GET"
+            })
+            if response.Body ~= "" then 
+                print(response.Body)
+                continue
+            end
+            print(v)
+            http_request({Url = BASE .. "/LaunchAccount?Account=".. v .."&PlaceId=" .. game.PlaceId .. "&JobId=" .. game.JobId .. "&Password=" .. PASSWORD,  Method = "GET"})
+            break
+        end
+    end
+
+end
+
+-- Detect Kick
+do
+
+    function GetErrorMessage()
+        local errorPrompt = promptOverlay:FindFirstChild("ErrorPrompt")
+        if not errorPrompt then 
+            return false 
+        end
+
+        local messageArea = errorPrompt:FindFirstChild("MessageArea")
+        if not messageArea then 
+            return false
+        end
+        local errorFrame = messageArea:FindFirstChild("ErrorFrame")
+        if not errorFrame then 
+            return false
+        end
+        local errorMessage = errorFrame:FindFirstChild("ErrorMessage")
+        if not errorMessage then 
+            return false
+        end
+        return errorMessage.Text
+    end
+
+    function Check_Banned()
+        while wait(5) do
+            local ErrorMessage = GetErrorMessage()
+            if not ErrorMessage then continue end
+            if string.find(ErrorMessage, "267") then
+                warn("BANNED FROM GAME")
+                request({Url = BASE .. "/SetField?Account=" .. LocalPlayer.Name .. "&Field=Banned&Value=True", Method = "GET"})
+                request({
+                    Url = BASE .. "/SetAlias?Account=" .. LocalPlayer.Name .. "&Password=" .. PASSWORD,
+                    Method = "POST",
+                    Headers = {
+                        ["Content-Type"] = "application/json"
+                    },
+                    Body = HttpService:JSONEncode('Banned')
+                })
+                LaunchNewAccount()
+                game:Shutdown()
+            end
+        end
+    end
+
+end
+
+
+task.spawn(Check_Banned)
+
+
